@@ -1,0 +1,23 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "helpdesk-escalation"
+resolve_s3 = true
+s3_prefix = "helpdesk-escalation"
+region = "ap-south-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = [
+  "EnvironmentName=dev",
+  "ScheduleExpression=rate(5 minutes)",
+  "DatabaseUrl=postgresql://user:password@host:5432/helpdesk?schema=public",
+  "EmailProvider=smtp",
+  "EmailFrom=no-reply@yourdomain.com",
+  "SmtpHost=smtp.yourdomain.com",
+  "SmtpPort=587",
+  "SmtpUser=your-smtp-user",
+  "SmtpPass=your-smtp-password",
+  "FacilitiesEscalationDuration=4",
+  "CareEscalationDuration=2",
+  "DryRun=false"
+]

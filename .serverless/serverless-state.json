@@ -191,7 +191,7 @@
                 "S3Bucket": {
                   "Ref": "ServerlessDeploymentBucket"
                 },
-                "S3Key": "serverless/helpdesk-escalation-batch/dev/1773910129606-2026-03-19T08:48:49.606Z/helpdesk-escalation-batch.zip"
+                "S3Key": "serverless/helpdesk-escalation-batch/dev/1773910454436-2026-03-19T08:54:14.436Z/helpdesk-escalation-batch.zip"
               },
               "Handler": "dist/index.handler",
               "Runtime": "nodejs20.x",
@@ -430,7 +430,7 @@
         ],
         "artifactsS3KeyDirname": "serverless/helpdesk-escalation-batch/dev/code-artifacts",
         "artifact": "/Users/sanjeevsharma/Batch_HelpDesk/.serverless/helpdesk-escalation-batch.zip",
-        "artifactDirectoryName": "serverless/helpdesk-escalation-batch/dev/1773910129606-2026-03-19T08:48:49.606Z"
+        "artifactDirectoryName": "serverless/helpdesk-escalation-batch/dev/1773910454436-2026-03-19T08:54:14.436Z"
       }
     },
     "layers": {},
@@ -438,7 +438,7 @@
     "artifact": "/Users/sanjeevsharma/Batch_HelpDesk/.serverless/helpdesk-escalation-batch.zip"
   },
   "package": {
-    "artifactDirectoryName": "serverless/helpdesk-escalation-batch/dev/1773910129606-2026-03-19T08:48:49.606Z",
+    "artifactDirectoryName": "serverless/helpdesk-escalation-batch/dev/1773910454436-2026-03-19T08:54:14.436Z",
     "artifact": "helpdesk-escalation-batch.zip"
   }
 }

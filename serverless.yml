@@ -1,0 +1,48 @@
+service: helpdesk-escalation-batch
+frameworkVersion: "3"
+useDotenv: true
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  architecture: x86_64
+  stage: ${opt:stage, 'dev'}
+  region: ${env:AWS_REGION, 'ap-south-1'}
+  timeout: 120
+  memorySize: 512
+  logRetentionInDays: 14
+  environment:
+    DATABASE_URL: ${env:DATABASE_URL}
+    EMAIL_PROVIDER: ${env:EMAIL_PROVIDER, 'smtp'}
+    EMAIL_FROM: ${env:EMAIL_FROM, 'no-reply@helpdesk.local'}
+    SMTP_HOST: ${env:SMTP_HOST, ''}
+    SMTP_PORT: ${env:SMTP_PORT, '587'}
+    SMTP_USER: ${env:SMTP_USER, ''}
+    SMTP_PASS: ${env:SMTP_PASS, ''}
+    FACILITIES_ESCALATION_DURATION: ${env:FACILITIES_ESCALATION_DURATION, '4'}
+    CARE_ESCALATION_DURATION: ${env:CARE_ESCALATION_DURATION, '2'}
+    DRY_RUN: ${env:DRY_RUN, 'false'}
+
+functions:
+  escalationBatch:
+    name: helpdesk-escalation-${self:provider.stage}
+    handler: dist/index.handler
+    events:
+      - schedule:
+          rate: ${env:SCHEDULE_EXPRESSION, 'rate(5 minutes)'}
+          enabled: true
+
+package:
+  patterns:
+    - dist/**
+    - prisma/schema.prisma
+    - node_modules/.prisma/**
+    - node_modules/@prisma/**
+    - node_modules/nodemailer/**
+    - node_modules/@types/**
+    - package.json
+    - package-lock.json
+    - '!src/**'
+    - '!**/*.map'
+    - '!**/*.md'
+    - '!**/test/**'

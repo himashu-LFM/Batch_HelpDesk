@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Helpdesk escalation batch deployed as AWS Lambda.
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Architectures:
+      - x86_64
+    Timeout: 120
+    MemorySize: 512
+    Tracing: Active
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+  ScheduleExpression:
+    Type: String
+    Default: rate(5 minutes)
+  DatabaseUrl:
+    Type: String
+    NoEcho: true
+  EmailProvider:
+    Type: String
+    Default: smtp
+  EmailFrom:
+    Type: String
+    Default: no-reply@helpdesk.local
+  SmtpHost:
+    Type: String
+    Default: ""
+  SmtpPort:
+    Type: Number
+    Default: 587
+  SmtpUser:
+    Type: String
+    NoEcho: true
+    Default: ""
+  SmtpPass:
+    Type: String
+    NoEcho: true
+    Default: ""
+  FacilitiesEscalationDuration:
+    Type: Number
+    Default: 4
+  CareEscalationDuration:
+    Type: Number
+    Default: 2
+  DryRun:
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false"
+    Default: "false"
+
+Resources:
+  HelpdeskEscalationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub helpdesk-escalation-${EnvironmentName}
+      Handler: dist/index.handler
+      CodeUri: .
+      Events:
+        EscalationSchedule:
+          Type: Schedule
+          Properties:
+            Description: Trigger helpdesk escalation batch.
+            Schedule: !Ref ScheduleExpression
+            Enabled: true
+      Environment:
+        Variables:
+          DATABASE_URL: !Ref DatabaseUrl
+          EMAIL_PROVIDER: !Ref EmailProvider
+          EMAIL_FROM: !Ref EmailFrom
+          SMTP_HOST: !Ref SmtpHost
+          SMTP_PORT: !Ref SmtpPort
+          SMTP_USER: !Ref SmtpUser
+          SMTP_PASS: !Ref SmtpPass
+          FACILITIES_ESCALATION_DURATION: !Ref FacilitiesEscalationDuration
+          CARE_ESCALATION_DURATION: !Ref CareEscalationDuration
+          DRY_RUN: !Ref DryRun
+
+Outputs:
+  EscalationFunctionName:
+    Description: Lambda function name.
+    Value: !Ref HelpdeskEscalationFunction
+  EscalationFunctionArn:
+    Description: Lambda function ARN.
+    Value: !GetAtt HelpdeskEscalationFunction.Arn

@@ -13,6 +13,16 @@ export interface EscalationSummary {
   errors: number;
 }
 
+interface EscalationResult {
+  caseId: string;
+  caseNumber: string;
+  caseType: CaseType;
+  recipientEmail: string;
+  notificationLogId: string;
+  emailSubject: string;
+  emailBody: string;
+}
+
 async function findRecipientForCaseType(caseType: CaseType): Promise<{ userId: string; email: string } | null> {
   const roleCode =
     caseType === "INTERNAL" ? "SENIOR_MANAGER_OPERATIONS" : "MEDICAL_ADMINISTRATOR";
@@ -82,69 +92,93 @@ export async function runEscalationBatch(): Promise<EscalationSummary> {
         continue;
       }
 
-      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        const updated = await tx.case.update({
-          where: { id: c.id },
-          data: {
-            status: "ESCALATED",
-            escalatedAt: now
-          }
-        });
+      const escalationResult = await prisma.$transaction(
+        async (tx: Prisma.TransactionClient): Promise<EscalationResult> => {
+          const updated = await tx.case.update({
+            where: { id: c.id },
+            data: {
+              status: "ESCALATED",
+              escalatedAt: now
+            }
+          });
 
-        await tx.caseEvent.create({
-          data: {
+          await tx.caseEvent.create({
+            data: {
+              caseId: updated.id,
+              eventType: "AUTO_ESCALATED",
+              eventLabel: "Case auto-escalated due to SLA breach",
+              metadataJson: JSON.stringify({
+                previousStatus: c.status,
+                escalatedAt: now.toISOString()
+              })
+            }
+          });
+
+          const emailSubject = `[${updated.caseNumber}] Case escalated`;
+          const emailBody = [
+            `Case Number: ${updated.caseNumber}`,
+            `Type: ${updated.caseType}`,
+            `Subject: ${updated.subject}`,
+            `Description: ${updated.description}`,
+            `Created At: ${updated.createdAt.toISOString()}`
+          ].join("\n");
+
+          const notificationLog = await tx.notificationLog.create({
+            data: {
+              caseId: updated.id,
+              recipientUserId: recipient.userId,
+              channel: "EMAIL",
+              templateKey: "case-escalated-v1",
+              status: "PENDING",
+              metadataJson: JSON.stringify({
+                reason: "AUTO_ESCALATED",
+                caseNumber: updated.caseNumber,
+                recipientEmail: recipient.email
+              })
+            }
+          });
+
+          return {
             caseId: updated.id,
-            eventType: "AUTO_ESCALATED",
-            eventLabel: "Case auto-escalated due to SLA breach",
-            metadataJson: JSON.stringify({
-              previousStatus: c.status,
-              escalatedAt: now.toISOString()
-            })
-          }
-        });
-
-        const emailSubject = `[${updated.caseNumber}] Case escalated`;
-        const emailBody = [
-          `Case Number: ${updated.caseNumber}`,
-          `Type: ${updated.caseType}`,
-          `Subject: ${updated.subject}`,
-          `Description: ${updated.description}`,
-          `Created At: ${updated.createdAt.toISOString()}`
-        ].join("\n");
-
-        const emailResult = await sendEmail({
-          to: recipient.email,
-          subject: emailSubject,
-          body: emailBody
-        });
-
-        if (emailResult.success) {
-          emailsSent += 1;
+            caseNumber: updated.caseNumber,
+            caseType: updated.caseType,
+            recipientEmail: recipient.email,
+            notificationLogId: notificationLog.id,
+            emailSubject,
+            emailBody
+          };
         }
+      );
 
-        await tx.notificationLog.create({
-          data: {
-            caseId: updated.id,
-            recipientUserId: recipient.userId,
-            channel: "EMAIL",
-            templateKey: "case-escalated-v1",
-            status: emailResult.success ? "SENT" : "FAILED",
-            providerMessageId: emailResult.providerMessageId ?? null,
-            metadataJson: JSON.stringify({
-              reason: "AUTO_ESCALATED",
-              caseNumber: updated.caseNumber
-            }),
-            // NOTE: base schema doesn't have these; if you later add them,
-            // uncomment next two fields:
-            // emailSentTo: recipient.email,
-            // emailSentAt: emailResult.success ? now : null,
-          }
-        });
+      const emailResult = await sendEmail({
+        to: escalationResult.recipientEmail,
+        subject: escalationResult.emailSubject,
+        body: escalationResult.emailBody
       });
 
+      await prisma.notificationLog.update({
+        where: { id: escalationResult.notificationLogId },
+        data: {
+          status: emailResult.success ? "SENT" : "FAILED",
+          providerMessageId: emailResult.providerMessageId ?? null
+        }
+      });
+
+      if (emailResult.success) {
+        emailsSent += 1;
+      }
+
       escalatedCount += 1;
-      log("info", "Escalated Case", { caseId: c.id, caseNumber: c.caseNumber, type: c.caseType });
-      log("info", "Email sent to", { caseId: c.id, to: recipient.email });
+      log("info", "Escalated Case", {
+        caseId: escalationResult.caseId,
+        caseNumber: escalationResult.caseNumber,
+        type: escalationResult.caseType
+      });
+      log("info", "Escalation email processed", {
+        caseId: escalationResult.caseId,
+        to: escalationResult.recipientEmail,
+        status: emailResult.success ? "SENT" : "FAILED"
+      });
     } catch (err) {
       errors += 1;
       log("error", "Error processing escalation for case", {
